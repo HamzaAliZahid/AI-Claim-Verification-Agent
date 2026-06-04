@@ -36,6 +36,9 @@ def get_source_type(url):
     else:
         response = ask_gemini_source_type(domain)
         return response
+    
+def calculate_heuristic_score():
+    pass
 
 if st.button("Verify Claim"):
     if claim:
@@ -45,6 +48,6 @@ if st.button("Verify Claim"):
         tavily_response = tavily_response["results"]
         for response in tavily_response:
             content = response["content"]
-            prompt = f"I am going to provide you with a claim and evidence. Your job is to see the claim and evidence and decide whether the evidence is supporting the claim, contradicting the claim, or neutral. Also give a credibility score ranging from 1 to 10 (both inclusive). \nUse this criteria to score: Does it make factual claims or just mentions opinions, Does it mention data or statistics, Does it refer or cite other sources, Is language neutral or emotional.\nYour response should be in the exact format: label score where label can be supporting, contradicting, or neutral and score is integer number.\nClaim: {claim}\nEvidence: {content}"
-            response = gemini_response(prompt).lower().strip()
-            st.write(response)
+            prompt = f"I am going to provide you with a claim and evidence. Your job is to see the claim and evidence and decide whether the evidence is supporting the claim, contradicting the claim, or neutral. Also give a credibility score ranging from 1 to 10 (both inclusive). \nUse this criteria to score: Does it make factual claims or just mentions opinions, Does it mention data or statistics, Does it refer or cite other sources, Is language neutral or emotional.\nYour response should be in the exact format (don't include < and >): <label score> where label can be supporting, contradicting, or neutral and score is integer number.\nClaim: {claim}\nEvidence: {content}"
+            response = gemini_response(prompt).lower().strip().split(' ')
+            source_data = (response[0], response[1])
