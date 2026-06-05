@@ -52,6 +52,11 @@ def calculate_heuristic_score(predictions):
 
 if st.button("Verify Claim"):
     if claim:
+        prompt = f"I will provide you a claim. Your job is to determine if there is ambiguity in it or not. If there is no ambiguity just output the word none, else output the unambiguous claim (only new claim no extra words)\nClaim: {claim}"
+        response = llm_response(prompt)
+        if response != "none":
+            claim = response
+            st.write(f"Reframed Claim: {claim}")
         sources_info = []
         sources_data = []
         tavily_client = TavilyClient(api_key = TAVILY_API_KEY)
