@@ -44,6 +44,8 @@ def calculate_heuristic_score(predictions):
     for prediction in predictions:
         heuristic_sum += prediction[0] * prediction[1] * prediction[2]
         total_weights += prediction[1] * prediction[2]
+    if total_weights == 0:
+        return 0.5
     heuristic_score = heuristic_sum / total_weights
     confidence_score = ((heuristic_score + 1) / 2)
     return confidence_score
@@ -51,20 +53,22 @@ def calculate_heuristic_score(predictions):
 if st.button("Verify Claim"):
     if claim:
         sources_info = []
+        sources_data = []
         tavily_client = TavilyClient(api_key = TAVILY_API_KEY)
-        tavily_response = tavily_client.search(claim, max_results = 3)
-        tavily_response = tavily_response["results"]
-        for response in tavily_response:
-            source_weight = SOURCE_TYPE_WEIGHTS[get_source_type(response["url"])]
-            content = response["content"]
+        tavily_responses = tavily_client.search(claim, max_results = 3, search_depth = "advanced", exclude_domains = ["youtube.com", "pinterest.com", "reddit.com", "instagram.com", "facebook.com", "tiktok.com", "x.com"])
+        tavily_responses = tavily_responses["results"]
+        for tavily_response in tavily_responses:
+            source_weight = SOURCE_TYPE_WEIGHTS[get_source_type(tavily_response["url"])]
+            content = tavily_response["content"]
             prompt = f"I am going to provide you with a claim and evidence. Your job is to see the claim and evidence and decide whether the evidence is supporting the claim, contradicting the claim, or neutral. Also give a credibility score ranging from 1 to 10 (both inclusive). \nUse this criteria to score: Does it make factual claims or just mentions opinions, Does it mention data or statistics, Does it refer or cite other sources, Is language neutral or emotional.\nYour response should be in the exact format (don't include < and >): <label score> where label can be supporting, contradicting, or neutral and score is integer number.\nClaim: {claim}\nEvidence: {content}"
             try:
                 response = llm_response(prompt).lower().strip().split(' ')
                 source_data = (int(LABEL_WEIGHTS[response[0]]), int(response[1]), source_weight)
-                sources_info.append((source_data, response[0], response["url"]))
+                sources_data.append(source_data)
+                sources_info.append((source_data, response[0], tavily_response["url"]))
             except:
                 pass
-        confidence_score = calculate_heuristic_score(sources_info[0])
+        confidence_score = calculate_heuristic_score(sources_data)
         percentage_confidence = round(confidence_score * 100, 1)
         st.write(f"Confidence Percentage: {percentage_confidence}%")
         index = 1
