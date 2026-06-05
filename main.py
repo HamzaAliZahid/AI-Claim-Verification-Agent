@@ -73,7 +73,12 @@ if st.button("Verify Claim"):
         st.write(f"Confidence Percentage: {percentage_confidence}%")
         index = 1
         for data in sources_info:
-            st.write(f"Source {index}:")
-            st.write(f"Label: {data[1]}")
-            st.write(f"URL: {data[2]}")
+            st.write(f"Source {index}:  \nLabel: {data[1]}  \nCredibility Score: {data[0][1]}  \nURL: {data[2]}  \n")
             index += 1
+        if percentage_confidence >= 50:
+            confidence_label = "true"
+        else:
+            confidence_label = "false"
+        prompt = f"I will give you a Claim and tell whether it is true or false. Your job is to give a small (max 2 line) explanation for why the claim is true or false.\nClaim: {claim}\nLabel: {confidence_label}"
+        response = llm_response(prompt)
+        st.write(f"Explanation:  \n{response}")
