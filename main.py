@@ -11,6 +11,7 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-3.5-flash"
 SOURCE_TYPE_WEIGHTS = {"academic" : 2, "government" : 1.9, "organization" : 1.5, "news" : 1.4, "unknown" : 1.0, "blog" : 0.6, "social" : 0.4}
+LABEL_WEIGHTS = {"supporting" : 1, "neutral" : 0, "contradicting" : -1}
 
 gemini_client = genai.Client(api_key = GEMINI_API_KEY)
 
@@ -37,17 +38,29 @@ def get_source_type(url):
         response = ask_gemini_source_type(domain)
         return response
     
-def calculate_heuristic_score():
-    pass
+def calculate_heuristic_score(predictions):
+    heuristic_sum = 0
+    total_weights = 0
+    for prediction in predictions:
+        heuristic_sum += prediction[0] * prediction[1] * prediction[2]
+        total_weights += prediction[1] * prediction[2]
+    heuristic_score = heuristic_sum / total_weights
+    confidence_score = ((heuristic_score + 1) / 2)
+    return confidence_score
 
 if st.button("Verify Claim"):
     if claim:
+        gemini_predictions = []
         tavily_client = TavilyClient(api_key = TAVILY_API_KEY)
         tavily_response = tavily_client.search(claim)
-        st.write(tavily_response)
         tavily_response = tavily_response["results"]
         for response in tavily_response:
+            source_weight = SOURCE_TYPE_WEIGHTS[get_source_type(response["url"])]
             content = response["content"]
             prompt = f"I am going to provide you with a claim and evidence. Your job is to see the claim and evidence and decide whether the evidence is supporting the claim, contradicting the claim, or neutral. Also give a credibility score ranging from 1 to 10 (both inclusive). \nUse this criteria to score: Does it make factual claims or just mentions opinions, Does it mention data or statistics, Does it refer or cite other sources, Is language neutral or emotional.\nYour response should be in the exact format (don't include < and >): <label score> where label can be supporting, contradicting, or neutral and score is integer number.\nClaim: {claim}\nEvidence: {content}"
             response = gemini_response(prompt).lower().strip().split(' ')
-            source_data = (response[0], response[1])
+            source_data = (int(LABEL_WEIGHTS[response[0]]), int(response[1]), source_weight)
+            gemini_predictions.append(source_data)
+        confidence_score = calculate_heuristic_score(gemini_predictions)
+        percentage_confidence = round(confidence_score * 100, 1)
+        st.write("Confidence Percentage: ", percentage_confidence)
