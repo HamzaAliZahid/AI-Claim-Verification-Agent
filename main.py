@@ -56,21 +56,23 @@ if st.button("Verify Claim"):
         response = llm_response(prompt)
         if response != "none":
             claim = response
-            st.write(f"Reframed Claim: {claim}")
+            st.write(f"Clarified Claim: {claim}")
         sources_info = []
         sources_data = []
+        llm_content = ""
         tavily_client = TavilyClient(api_key = TAVILY_API_KEY)
         tavily_responses = tavily_client.search(claim, max_results = 3, search_depth = "advanced", exclude_domains = ["youtube.com", "pinterest.com", "reddit.com", "instagram.com", "facebook.com", "tiktok.com", "x.com"])
         tavily_responses = tavily_responses["results"]
         for tavily_response in tavily_responses:
-            source_weight = SOURCE_TYPE_WEIGHTS[get_source_type(tavily_response["url"])]
+            source_type = get_source_type(tavily_response["url"])
+            source_weight = SOURCE_TYPE_WEIGHTS[source_type]
             content = tavily_response["content"]
             prompt = f"I am going to provide you with a claim and evidence. Your job is to see the claim and evidence and decide whether the evidence is supporting the claim, contradicting the claim, or neutral. Also give a credibility score ranging from 1 to 10 (both inclusive). \nUse this criteria to score: Does it make factual claims or just mentions opinions, Does it mention data or statistics, Does it refer or cite other sources, Is language neutral or emotional.\nYour response should be in the exact format (don't include < and >): <label score> where label can be supporting, contradicting, or neutral and score is integer number.\nClaim: {claim}\nEvidence: {content}"
             try:
                 response = llm_response(prompt).lower().strip().split(' ')
                 source_data = (int(LABEL_WEIGHTS[response[0]]), int(response[1]), source_weight)
                 sources_data.append(source_data)
-                sources_info.append((source_data, response[0], tavily_response["url"]))
+                sources_info.append((source_data, response[0], tavily_response["url"], source_type))
             except:
                 pass
         confidence_score = calculate_heuristic_score(sources_data)
@@ -78,7 +80,7 @@ if st.button("Verify Claim"):
         st.write(f"Confidence Percentage: {percentage_confidence}%")
         index = 1
         for data in sources_info:
-            st.write(f"Source {index}:  \nLabel: {data[1]}  \nCredibility Score: {data[0][1]}  \nURL: {data[2]}  \n")
+            st.write(f"Source {index}:  \nLabel: {data[1]}  \nCredibility Score: {data[0][1]}/10  \nURL: {data[2]}  \nSource Type: {data[3]}  \n")
             index += 1
         if percentage_confidence >= 50:
             confidence_label = "true"
