@@ -23,13 +23,14 @@ def llm_response(llm_prompt):
     return response.output_text
 
 def ask_llm_source_type(domain):
-    prompt = f"I will give you a domain and your job is to tell me the most likely source this domain refers to. Your response must be one word from these: academic, news, government, organization, social, blog, unknown. Output unknown if you are unsure about the source\nDomain: {domain}"
+    prompt = f"I will give you a domain and your job is to tell me the most likely source this domain refers to. Your response must be one word from these only (you are not allowed any other word except these): academic, news, government, organization, social, blog, unknown. Output unknown if you are unsure about the source\nDomain: {domain}"
     response = llm_response(prompt).lower()
+    if response not in SOURCE_TYPE_WEIGHTS:
+        return "unknown"
     return response
 
 def get_source_type(url):
     domain = urlparse(url).netloc
-
     if any(substring in domain for substring in [".edu", "arxiv", "pubmed"]):
         return "academic"
     elif ".gov" in domain:
@@ -52,7 +53,7 @@ def calculate_heuristic_score(predictions):
 
 if st.button("Verify Claim"):
     if claim:
-        prompt = f"I will provide you a claim. Your job is to determine if there is ambiguity in it or not. If there is no ambiguity just output the word none, else output the unambiguous claim (only new claim no extra words)\nClaim: {claim}"
+        prompt = f"I will provide you a claim. Check only if the claim is ambiguous (missing key context like location, time, or subject that makes it unclear what is being claimed). If ambiguous, output a more specific version. If not ambiguous, output exactly 'none'. Do not fact-check, do not judge if the claim is true or false, do not add explanation. Only output the clarified claim or 'none'.\nClaim: {claim}"
         response = llm_response(prompt)
         if response != "none":
             claim = response
