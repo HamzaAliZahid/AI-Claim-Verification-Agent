@@ -34,22 +34,22 @@ def llm_response(llm_prompt):
     response = client.responses.create(input = llm_prompt, model = INFERENCE_MODEL)
     return response.output_text
 
-def ask_llm_source_type(domain):
-    prompt = f"I will give you a domain and your job is to tell me the most likely source this domain refers to. Your response must be one word from these only (you are not allowed any other word except these): academic, news, government, organization, social, blog, unknown. Output unknown if you are unsure about the source\nDomain: {domain}"
-    response = llm_response(prompt).lower()
-    if response not in SOURCE_TYPE_WEIGHTS:
-        return "unknown"
-    return response
-
 def get_source_type(url):
     domain = urlparse(url).netloc
-    if any(substring in domain for substring in [".edu", "arxiv", "pubmed"]):
+    if any(substring in domain for substring in [".edu", "arxiv", "pubmed", "acm.org", "ieee"]):
         return "academic"
-    elif ".gov" in domain:
+    elif any(substring in domain for substring in [".gov", ".gov."]):
         return "government"
+    elif any(substring in domain for substring in ["bbc", "cnn", "reuters", "apnews", "aljazeera", "nytimes", "washingtonpost", "theguardian"]):
+        return "news"
+    elif any(substring in domain for substring in ["twitter", "x.com", "reddit", "facebook", "instagram", "tiktok"]):
+        return "social"
+    elif any(substring in domain for substring in ["wikipedia", "britannica"]):
+        return "organization"
+    elif any(substring in domain for substring in ["medium", "blog", "substack"]):
+        return "blog"
     else:
-        response = ask_llm_source_type(domain)
-        return response
+        return "unknown"
     
 def calculate_heuristic_score(predictions):
     heuristic_sum = 0
