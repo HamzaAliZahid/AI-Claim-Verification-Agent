@@ -16,6 +16,7 @@ class graph_state(TypedDict):
     sources_info : list
     current_confidence_percentage : float
     current_confidence_label : str
+    search_query : str
 
 load_dotenv()
 
@@ -68,8 +69,13 @@ def clarify_claim(state):
     response = llm_response(prompt)
     if response != "none" and response.lower().strip() != state['claim'].lower().strip():
         st.write(f"Clarified Claim: {response}")
-        return {"claim" : response}
+        return {"claim" : response, "search_query" : response}
     return {}
+
+def rewrite_query(state):
+    prompt = f"Give me web search query for this claim so that I can fack check it from tavily. Keep the output concise. Do not change meaning of the claim or assume missing context or try to fact check the claim. Include keywords if suitable. Your output should only be query nothing else. Claim: {state['claim']}"
+    response = llm_response(prompt)
+    return {"search_query" : response}
 
 def search_tavily(state):
     tavily_client = TavilyClient(api_key = TAVILY_API_KEY)
@@ -124,9 +130,13 @@ def final_verdict_explanation(state):
 def iteration_decider(state):
     if state["retry_count"] == 3:
         return "verdict"
+    elif state["retry_count"] == 1:
+        state["retry_count"] += 1
+        return "query"
     elif state["current_confidence_percentage"] >= 70 or state["current_confidence_percentage"] <= 30:
         return "verdict" 
     else:
+        state["retry_count"] += 1
         return "clarify"
 
 def agent_pipeline(state):
@@ -136,12 +146,14 @@ def agent_pipeline(state):
     pipeline.add_node("scores", get_sources_info)
     pipeline.add_node("confidence", calculate_confidence)
     pipeline.add_node("verdict", final_verdict_explanation)
+    pipeline.add_node("query", rewrite_query)
 
     pipeline.add_edge(START, "search")
     pipeline.add_edge("search", "scores")
     pipeline.add_edge("scores", "confidence")
-    pipeline.add_conditional_edges("confidence", iteration_decider, {"verdict" : "verdict", "clarify" : "clarify"})
+    pipeline.add_conditional_edges("confidence", iteration_decider, {"verdict" : "verdict", "clarify" : "clarify", "query" : "query"})
     pipeline.add_edge("clarify", "search")
+    pipeline.add_edge("query", "search")
     pipeline.add_edge("verdict", END)
 
     graph = pipeline.compile()
@@ -150,6 +162,6 @@ def agent_pipeline(state):
 
 if st.button("Verify Claim"):
     if claim:
-        pipeline_state : graph_state = {"claim" : claim, "search_results" : [], "retry_count" : 0, "final_result" : "", "sources_data" : [], "sources_info" : [], "current_confidence_percentage" : 0.0, "current_confidence_label" : ""}
+        pipeline_state : graph_state = {"claim" : claim, "search_results" : [], "retry_count" : 0, "final_result" : "", "sources_data" : [], "sources_info" : [], "current_confidence_percentage" : 0.0, "current_confidence_label" : "", "search_query" : claim}
         agent_pipeline(pipeline_state)
         
