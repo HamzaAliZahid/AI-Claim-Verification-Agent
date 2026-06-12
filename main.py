@@ -64,10 +64,10 @@ def calculate_heuristic_score(predictions):
     return confidence_score
 
 def clarify_claim(state):
-    prompt = f"I will provide you a claim. Check only if the claim is ambiguous (missing key context like location, time, or subject that makes it unclear what is being claimed). If ambiguous, output a more specific version. If not ambiguous, output exactly 'none'. Do not fact-check, do not judge if the claim is true or false, do not add explanation. Only output the clarified claim or 'none'.\nClaim: {state['claim']}"
+    prompt = f"I will provide you a claim. Check only if the claim is ambiguous (missing key context like location, time, or subject that makes it unclear what is being claimed). If ambiguous, output a more specific version. If not ambiguous, output exactly 'none'. Do not fact-check, do not judge if the claim is true or false, do not add explanation. Make sure that the clarified claim is different from the claim I give you as input. Only output the clarified claim or 'none'.\nClaim: {state['claim']}"
     response = llm_response(prompt)
-    if response != "none":
-        st.write(f"Clarified Claim: {state["claim"]}")
+    if response != "none" and response.lower().strip() != state['claim'].lower().strip():
+        st.write(f"Clarified Claim: {response}")
         return {"claim" : response}
     return {}
 
