@@ -85,10 +85,12 @@ def calculate_confidence(state):
     for data in state["sources_info"]:
         st.write(f"Source {index}:  \nLabel: {data[1]}  \nCredibility Score: {data[0][1]}/10  \nURL: {data[2]}  \nSource Type: {data[3]}  \n")
         index += 1
-    if percentage_confidence >= 50:
+    if percentage_confidence >= 60:
         confidence_label = "true"
-    else:
+    elif percentage_confidence <= 40:
         confidence_label = "false"
+    else:
+        confidence_label = "none"
     return {"current_confidence_percentage" : percentage_confidence, "current_confidence_label" : confidence_label}
 
 def get_sources_info(state):
@@ -109,11 +111,24 @@ def get_sources_info(state):
     return {"sources_data" : sources_data, "sources_info" : sources_info}
 
 def final_verdict_explanation(state):
-    prompt = f"I will give you a Claim and tell whether it is true or false. Your job is to give a small (max 2 line) explanation for why the claim is true or false.\nClaim: {state['claim']}\nLabel: {state['current_confidence_label']}"
-    response = llm_response(prompt)
-    st.write(f"Explanation:  \n{response}")
+    verdict = ""
+    if state["current_confidence_label"] == "true":
+        verdict = "Claim is likely true"
+    elif state["current_confidence_label"] == "false":
+        verdict = "Claim is likely false"
+    else:
+        verdict = "Not enough evidence to verify if the claim is true or false"
+    st.write(f"Explanation:  \n{verdict}")
     return {}
     
+def iteration_decider(state):
+    if state["retry_count"] == 3:
+        return "verdict"
+    elif state["current_confidence_percentage"] >= 70 or state["current_confidence_percentage"] <= 30:
+        return "verdict" 
+    else:
+        return "clarify"
+
 def agent_pipeline(state):
     pipeline = StateGraph(graph_state)
     pipeline.add_node("clarify", clarify_claim)
@@ -122,11 +137,11 @@ def agent_pipeline(state):
     pipeline.add_node("confidence", calculate_confidence)
     pipeline.add_node("verdict", final_verdict_explanation)
 
-    pipeline.add_edge(START, "clarify")
-    pipeline.add_edge("clarify", "search")
+    pipeline.add_edge(START, "search")
     pipeline.add_edge("search", "scores")
     pipeline.add_edge("scores", "confidence")
-    pipeline.add_edge("confidence", "verdict")
+    pipeline.add_conditional_edges("confidence", iteration_decider, {"verdict" : "verdict", "clarify" : "clarify"})
+    pipeline.add_edge("clarify", "search")
     pipeline.add_edge("verdict", END)
 
     graph = pipeline.compile()
